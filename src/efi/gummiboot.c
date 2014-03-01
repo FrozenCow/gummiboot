@@ -76,6 +76,7 @@ typedef struct {
         UINTN timeout_sec;
         UINTN timeout_sec_config;
         INTN timeout_sec_efivar;
+        CHAR16 *title;
         CHAR16 *entry_default_pattern;
         CHAR16 *splash;
         EFI_GRAPHICS_OUTPUT_BLT_PIXEL *background;
@@ -440,6 +441,8 @@ static VOID print_status(Config *config, EFI_FILE *root_dir, CHAR16 *loaded_imag
         if (config->timeout_sec_efivar >= 0)
                 Print(L"timeout (EFI var):      %d\n", config->timeout_sec_efivar);
         Print(L"timeout (config):       %d\n", config->timeout_sec_config);
+        if (config->title)
+                Print(L"title                   '%s'\n", config->title);
         if (config->entry_default_pattern)
                 Print(L"default pattern:        '%s'\n", config->entry_default_pattern);
         if (config->splash)
@@ -634,6 +637,13 @@ static BOOLEAN menu_run(Config *config, ConfigEntry **chosen_entry, EFI_FILE *ro
                 UINT64 key;
 
                 if (refresh) {
+
+                        if (config->title && y_start-2 >= 0) {
+                                uefi_call_wrapper(ST->ConOut->SetCursorPosition, 3, ST->ConOut, 0, y_start-2);
+                                uefi_call_wrapper(ST->ConOut->SetAttribute, 2, ST->ConOut, EFI_WHITE|EFI_BACKGROUND_BLACK);
+                                uefi_call_wrapper(ST->ConOut->OutputString, 2, ST->ConOut, config->title);
+                        }
+
                         for (i = 0; i < config->entry_count; i++) {
                                 if (i < idx_first || i > idx_last)
                                         continue;
@@ -1051,6 +1061,12 @@ static VOID config_defaults_load_from_file(Config *config, CHAR8 *content) {
                         config->timeout_sec_config = Atoi(s);
                         config->timeout_sec = config->timeout_sec_config;
                         FreePool(s);
+                        continue;
+                }
+
+                if (strcmpa((CHAR8 *)"title", key) == 0) {
+                        FreePool(config->title);
+                        config->title = stra_to_str(value);
                         continue;
                 }
 
@@ -1704,6 +1720,7 @@ static VOID config_free(Config *config) {
         FreePool(config->options_edit);
         FreePool(config->entry_oneshot);
         FreePool(config->entries_auto);
+        FreePool(config->title);
         FreePool(config->splash);
         FreePool(config->background);
 }
